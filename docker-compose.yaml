@@ -1,0 +1,25 @@
+services:
+  db:
+    image: mariadb:lts
+    ports:
+      - 3307:3306
+    volumes:
+      - "./db/scripts:/docker-entrypoint-initdb.d"
+    env_file:
+      - ./.env
+    networks:
+      - default
+      
+  server:
+    build: ./
+    volumes:
+      - ./src:/app
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      - default
+
+networks:
+  default:
+    driver: bridge

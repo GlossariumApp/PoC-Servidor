@@ -1,0 +1,246 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Glossarium - Test</title>
+  <style>
+    body{font-family:system-ui,Arial;margin:20px}
+    input,textarea,select,button{margin:4px}
+    #userInfo{margin-left:8px;font-weight:600}
+    #adminPanel{border:1px solid #ddd;padding:10px;margin-top:12px;background:#fbfbfb}
+    #adminPanel textarea{width:100%;height:80px}
+    .small{font-size:0.9rem;color:#666}
+  </style>
+</head>
+<body>
+  <h1>Glossarium</h1>
+
+  <div id="auth">
+    <input id="name" placeholder="nome de usuário" autocomplete="username">
+    <input id="password" type="password" placeholder="senha" autocomplete="current-password">
+    <button id="loginBtn" type="button">Login</button>
+    <button id="logoutBtn" type="button" style="display:none">Logout</button>
+    <span id="userInfo"></span>
+  </div>
+
+  <form id="searchForm" method="GET" style="margin-top:12px">
+    <input type="text" name="querry" placeholder="Digite a palavra">
+    <select name="period" id="searchPeriod">
+      <option value="brasil_colonial">brasil_colonial</option>
+      <option value="brasil_imperial">brasil_imperial</option>
+    </select>
+    <button id="searchBtn" type="button">search</button>
+  </form>
+
+  <!-- admin panel: só visível para admin -->
+  <div id="adminPanel" style="display:none">
+    <h3>Criar entrada (admin)</h3>
+    <div>
+      <label>Termo<br>
+        <input id="entryWord" type="text" placeholder="termo">
+      </label>
+    </div>
+    <div>
+      <label>Definição<br>
+        <textarea id="entryDefinition" placeholder="definição"></textarea>
+      </label>
+    </div>
+    <div>
+      <label>Fonte(s)<br>
+        <textarea id="entrySource" placeholder="fontes (ex: livro, link, etc.)"></textarea>
+      </label>
+    </div>
+    <div>
+      <label>Período<br>
+        <select id="entryPeriod">
+          <option value="brasil_colonial">brasil_colonial</option>
+          <option value="brasil_imperial">brasil_imperial</option>
+        </select>
+      </label>
+    </div>
+    <div style="margin-top:8px">
+      <button id="createEntryBtn" type="button">Criar entrada</button>
+      <span id="createStatus" class="small"></span>
+    </div>
+  </div>
+
+  <div id="results" style="margin-top:1rem"></div>
+
+<script>
+(function(){
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const userInfo = document.getElementById('userInfo');
+  const searchBtn = document.getElementById('searchBtn');
+  const form = document.getElementById('searchForm');
+  const out = document.getElementById('results');
+
+  const adminPanel = document.getElementById('adminPanel');
+  const createEntryBtn = document.getElementById('createEntryBtn');
+  const createStatus = document.getElementById('createStatus');
+
+  function setAuthenticated(user){
+    if (user) {
+      userInfo.textContent = (user.name || user) + (user.role ? ' ('+user.role+')' : '');
+      logoutBtn.style.display = 'inline';
+      loginBtn.style.display = 'none';
+      // verifcar se é admin
+      if (user.role && user.role.toLowerCase() === 'admin') {
+        adminPanel.style.display = 'block';
+      } else {
+        adminPanel.style.display = 'none';
+      }
+    } else {
+      userInfo.textContent = '';
+      logoutBtn.style.display = 'none';
+      loginBtn.style.display = 'inline';
+      adminPanel.style.display = 'none';
+    }
+  }
+
+  //gambiarra 
+  function getXsrfTokenFromCookies(){
+    const m = document.cookie.split('; ').find(s => s.startsWith('XSRF-TOKEN='));
+    if (!m) return '';
+    return decodeURIComponent(m.split('=')[1]);
+  }
+
+  // CSRF cookie pro (Sanctum)
+  async function getCsrf(){
+    await fetch('/sanctum/csrf-cookie', { credentials: 'include' });
+  }
+
+  // helper: read response as text, try JSON, otherwise return text
+  async function readJsonOrText(res){
+    const text = await res.text();
+    try { return { ok: res.ok, data: text ? JSON.parse(text) : null, text }; }
+    catch (e) { return { ok: res.ok, data: null, text }; }
+  }
+
+  async function checkAuth(){
+    try {
+      const res = await fetch('/api/user', { credentials: 'include', headers:{'Accept':'application/json'} });
+      const r = await readJsonOrText(res);
+      if (!r.ok) { setAuthenticated(null); return; }
+      setAuthenticated(r.data || null);
+    } catch (e) { setAuthenticated(null); }
+  }
+
+  loginBtn.addEventListener('click', async () => {
+    const name = document.getElementById('name').value.trim();
+    const password = document.getElementById('password').value;
+    if (!name || !password) { alert('preencha nome e senha'); return; }
+    try {
+      await getCsrf();
+      const xsrf = getXsrfTokenFromCookies();
+      const res = await fetch('/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type':'application/json',
+          'Accept':'application/json',
+          'X-XSRF-TOKEN': xsrf
+        },
+        body: JSON.stringify({ name, password })
+      });
+      const r = await readJsonOrText(res);
+      if (!r.ok) {
+        // show server text when not JSON (helps debugging 419/500 HTML)
+        throw new Error(r.data ? (r.data.error || JSON.stringify(r.data)) : (`status ${res.status}\n${r.text}`));
+      }
+      setAuthenticated(r.data.user || r.data || { name });
+    } catch (err) {
+      alert('login falhou: ' + (err.message || err));
+      console.error('login error:', err);
+      setAuthenticated(null);
+    }
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      await getCsrf();
+      const xsrf = getXsrfTokenFromCookies();
+      await fetch('/logout', { method: 'POST', credentials: 'include', headers:{'Content-Type':'application/json','X-XSRF-TOKEN': xsrf,'Accept':'application/json'}});
+    } catch (e) {
+      console.error('logout error', e);
+    }
+    setAuthenticated(null);
+  });
+
+  async function doSearch(){
+    out.textContent = 'Buscando...';
+    const fd = new FormData(form);
+    const q = encodeURIComponent(fd.get('querry') || '');
+    const period = encodeURIComponent(fd.get('period') || 'brasil_colonial');
+
+    const url = `/api/search?querry=${q}&period=${period}`;
+    try {
+      const res = await fetch(url, { credentials: 'include', headers:{'Accept':'application/json'} });
+      const r = await readJsonOrText(res);
+      if (!r.ok) throw new Error(r.data ? (r.data.error || JSON.stringify(r.data)) : (`status ${res.status}\n${r.text}`));
+      const data = r.data || {};
+      const results = data.results || [];
+      if (!results.length) { out.innerHTML = '<p>Nenhum resultado</p>'; return; }
+      const ul = document.createElement('ul');
+      for (const item of results) {
+        const li = document.createElement('li');
+        const word = escapeHtml(item.word || item.term || '');
+        const def = escapeHtml(item.definition || item.def || '');
+        li.innerHTML = `<strong>${word}</strong>: ${def}`;
+        ul.appendChild(li);
+      }
+      out.innerHTML = ''; out.appendChild(ul);
+    } catch (err) {
+      out.innerHTML = '<p>Erro: ' + escapeHtml(err.message || 'unknown') + '</p>';
+      console.error('search error', err);
+    }
+  }
+ 
+  createEntryBtn.addEventListener('click', async () => {
+    createStatus.textContent = '';
+    const word = document.getElementById('entryWord').value.trim();
+    const definition = document.getElementById('entryDefinition').value.trim();
+    const source = document.getElementById('entrySource').value.trim();
+    const period = document.getElementById('entryPeriod').value;
+
+    if (!word || !definition) { createStatus.textContent = 'Termo e definição são obrigatórios.'; return; }
+
+    try {
+      await getCsrf();
+      const xsrf = getXsrfTokenFromCookies();
+      createStatus.textContent = 'Enviando...';
+      const res = await fetch('/admin/entry', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-XSRF-TOKEN': xsrf
+        },
+        body: JSON.stringify({ word, definition, source, period })
+      });
+      const r = await readJsonOrText(res);
+      if (!r.ok) {
+        throw new Error(r.data ? (r.data.error || JSON.stringify(r.data)) : (`status ${res.status}\n${r.text}`));
+      }
+      createStatus.textContent = 'Sucesso :-).';
+      // limpar campos
+      document.getElementById('entryWord').value = '';
+      document.getElementById('entryDefinition').value = '';
+      document.getElementById('entrySource').value = '';
+    } catch (err) {
+      createStatus.textContent = 'Erro: ' + (err.message || 'unknown');
+      console.error('create entry error', err);
+    }
+  });
+
+  searchBtn.addEventListener('click', doSearch);
+  form.addEventListener('submit', e => { e.preventDefault(); doSearch(); });
+
+  checkAuth();
+})();
+</script>
+</body>
+</html>
