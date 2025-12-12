@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use Illuminate\Http\Requests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Http\Requests\StoreEntryRequest;
 
 
 class AdminEntryController extends Controller
@@ -14,27 +15,20 @@ class AdminEntryController extends Controller
         $this->middleware('auth'); // exige sessão
     }
 
-    public function store(Request $request)
-    {
-        $user = Auth::user();
-        if (! $user || strtolower($user->role ?? '') !== 'admin') {
-            return response()->json(['error' => 'unauthorized'], 403);
-        }
+    public function store(StoreEntryRequest $request)
+    {   
+        
+        $period = $request->input('period');
+        $word = $request->input('word');
+        $definition = $request->input('definition');
+        $source = $request->input('source');
 
-        $data = $request->validate([
-            'word'       => 'required|string|max:255',
-            'definition' => 'required|string',
-            'source'     => 'nullable|string',
-            'period'     => 'required|string|in:brasil_colonial,brasil_imperial',
-        ]);
-
-        $table = $data['period'];
 
         try {
-            $id = DB::table($table)->insertGetId([
-                'word'       => $data['word'],
-                'definition' => $data['definition'],
-                'source'     => $data['source'] ?? null,
+            $id = DB::table($period)->insertGetId([
+                'word'       => $word,
+                'definition' => $definition,
+                'source'     => $source,
             ]);
         } catch (\Throwable $e) {
             return response()->json(['error' => 'db_error', 'message' => $e->getMessage()], 500);

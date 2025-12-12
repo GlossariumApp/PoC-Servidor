@@ -2,20 +2,23 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use PhpParser\Node\Expr\Cast\String_;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AdminEntryController;
+use App\Http\Middleware\EnsureUserIsAdmin;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+Route::post('/login', [AuthController::class, 'login']);
 
-Route::get('/hello', function (Request $request) {
-    return response()->json(['message' => 'Hello World!']);
+Route::middleware('auth:sanctum')->group(function () {
+    
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    });
+
+    Route::post('/logout', [AuthController::class, 'logout']);
+
+    Route::post('/admin/entry', [AdminEntryController::class, 'store'])
+         ->middleware(EnsureUserIsAdmin::class);
 });
-
-Route::get('/query/{termo}', function (Request $request, string $termo) {
-    $variavel = $termo;
-    return response()->json(['recebido' => $variavel]);
-})->where('texto', '.*');
 
 Route::get('/search', [SearchController::class, 'index'])->name('search.index');

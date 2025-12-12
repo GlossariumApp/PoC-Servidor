@@ -28,30 +28,36 @@ class AuthController extends Controller
         return response()->json(['ok' => true, 'user' => ['id'=>$user->id,'name'=>$user->name,'role'=>$user->role]]);
     }
 
-    // login por sessão
+    // login por TOKEN (API)
     public function login(Request $request)
     {
-        $data = $request->validate([
+        $request->validate([
             'name' => 'required|string',
             'password' => 'required|string',
         ]);
 
-        if (! Auth::attempt(['name' => $data['name'], 'password' => $data['password']])) {
+        $user = User::where('name', $request->name)->first();
+
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json(['error' => 'credenciais inválidas'], 401);
         }
 
-        $request->session()->regenerate();
+        $user->tokens()->delete();
+        $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json(['ok' => true, 'user' => Auth::user()]);
+        return response()->json([
+            'ok' => true,
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user
+        ]);
     }
 
-    // logout (invalida sessão)
     public function logout(Request $request)
     {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        // Revoga o token que foi usado para autenticar a requisição atual
+        $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['ok' => true]);
+        return response()->json(['ok' => true, 'message' => 'Token revogado']);
     }
 }

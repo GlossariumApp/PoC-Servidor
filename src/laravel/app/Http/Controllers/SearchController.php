@@ -8,29 +8,25 @@ class SearchController extends Controller
 {
     public function index(Request $request)
     {
-        $q = trim($request->input('querry', ''));
-        $period = $request->input('period', 'brasil_colonial');
+        $q = trim($request->input('query', ''));
+        $period = $request->input('period');
 
-        /*
-        $map = [
-            '1' => 'brasil_colonial',
-            '2' => 'brasil_imperial', 
+        $allowedTables = [
+            'brasil_colonial',
+            'brasil_imperial',
         ];
-        
-        
-        if (! array_key_exists($period, $map)) {
-            return response()->json(['error' => 'periodo inválido'], 400);
-        }
-        
-        */
 
-        $table = $period;
+        if (!$period || !in_array($period, $allowedTables)){
+            return response()->json([
+                'error' => 'Período inválido ou não informado. Opções: ' . implode(', ', $allowedTables)
+            ], 400);
+        }
 
         if ($q === '') {
             return response()->json(['results' => []]);
         }
 
-        $results = DB::table($table)
+        $results = DB::table($period)
             ->where('word', 'like', "%{$q}%")
             ->limit(50)
             ->get();
@@ -38,7 +34,6 @@ class SearchController extends Controller
         return response()->json([
             'query' => $q,
             'period' => $period,
-            'table' => $table,
             'results' => $results,
         ]);
     }
