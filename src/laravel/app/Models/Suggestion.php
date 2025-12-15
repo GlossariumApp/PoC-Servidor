@@ -2,9 +2,25 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Model;
+
+class Suggestion extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'user_id',
+        'word',
+        'definition',
+        'source',
+        'period',
+        'status'
+    ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+}
 
