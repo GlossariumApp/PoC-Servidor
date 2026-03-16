@@ -2,19 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Requests;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Http\Requests\StoreEntryRequest;
 
 
 class AdminEntryController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth'); // exige sessão
-    }
-
     public function store(StoreEntryRequest $request)
     {   
         
