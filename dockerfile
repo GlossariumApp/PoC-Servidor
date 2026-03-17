@@ -12,6 +12,7 @@ RUN apk add --no-cache git curl unzip; \
 WORKDIR /app
 COPY ./src /app
 
-EXPOSE 80
+EXPOSE 8080
+
 # use router.php so static files in public/ are served
-CMD ["php", "-S", "0.0.0.0:80", "-t", "laravel/public"]
+CMD ["php", "-S", "0.0.0.0:8080", "-t", "laravel/public"]
