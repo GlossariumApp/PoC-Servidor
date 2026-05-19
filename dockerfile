@@ -12,6 +12,9 @@ RUN apk add --no-cache git curl unzip; \
 WORKDIR /app
 COPY ./src /app
 
+WORKDIR /app/laravel
+RUN composer install --no-interaction --prefer-dist
+
 EXPOSE 8080
 
 # use router.php so static files in public/ are served
