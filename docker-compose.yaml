@@ -5,11 +5,15 @@ services:
       - 3307:3306
     env_file:
       - ./.env
+    volumes:
+      - ./src/scripts:/docker-entrypoint-initdb.d:ro
     networks:
       - default
       
   server:
-    build: ./
+    build: 
+      context: ./
+      dockerfile: dockerfile
     volumes:
       - ./src:/app
     ports:
